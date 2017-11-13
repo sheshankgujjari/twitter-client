@@ -1,5 +1,7 @@
 ##Regiter an application in twitter
 
+![Optional Text](../master/images/registertwitter.png
+
 Go to https://apps.twitter.com/
 Click on Keys and Access Token
 Copy Consumer Key (API Key) as app-id
