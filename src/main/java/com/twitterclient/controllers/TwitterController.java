@@ -10,10 +10,7 @@ import org.springframework.http.MediaType;
 import org.springframework.social.ExpiredAuthorizationException;
 import org.springframework.social.connect.Connection;
 import org.springframework.social.connect.ConnectionRepository;
-import org.springframework.social.twitter.api.CursoredList;
-import org.springframework.social.twitter.api.Tweet;
-import org.springframework.social.twitter.api.Twitter;
-import org.springframework.social.twitter.api.TwitterProfile;
+import org.springframework.social.twitter.api.*;
 import org.springframework.social.twitter.api.impl.TwitterTemplate;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
@@ -25,7 +22,7 @@ import javax.inject.Inject;
 @RestController
 @RequestMapping(TwitterController.TWITTER_BASE_URI)
 public class TwitterController {
-    public static final String TWITTER_BASE_URI = "/svc/v1/tweets";
+    public static final String TWITTER_BASE_URI = "/tweets";
 
     private static final long WORLDWIDE_WOE = 1L;
 
@@ -47,10 +44,6 @@ public class TwitterController {
 
     @RequestMapping(value = "/getFollowersCount/{username}")
     public int getFollowersCount(@PathVariable(name = "username") String username) {
-        if(connectionRepository.findPrimaryConnection(Twitter.class) == null) {
-            LOG.error("No connection to Twitter available");
-            return -1;
-        }
         return twitter.friendOperations().getFollowers(username).size();
     }
 
@@ -72,92 +65,78 @@ public class TwitterController {
         return TwitterHelper.getUserProfile(twitter);
     }
     
-    @RequestMapping(value = "/getScreenName",produces = MediaType.APPLICATION_JSON_UTF8_VALUE)
+    @RequestMapping(value = "/getscreenname",produces = MediaType.APPLICATION_JSON_UTF8_VALUE)
     public String getScreenName()
     {
         return TwitterHelper.getScreenName(twitter);
     }
     
-    @RequestMapping(value = "/getFriends", produces = MediaType.APPLICATION_JSON_UTF8_VALUE)
-    public String getFriends(Model model)
+    @RequestMapping(value = "/getfriends", produces = MediaType.APPLICATION_JSON_UTF8_VALUE)
+    public CursoredList<TwitterProfile> getFriends()
     {
         CursoredList<TwitterProfile> friends = TwitterHelper.getFriends(twitter);
-        model.addAttribute("friends", friends);
-        return "hello";
+
+        return friends;
     }
     
-    @RequestMapping(value = "/getHomeTimeLine", produces = MediaType.APPLICATION_JSON_UTF8_VALUE)
+    @RequestMapping(value = "/gethometimeline", produces = MediaType.APPLICATION_JSON_UTF8_VALUE)
     public List<Tweet> getHomeTimeLine()
     {
         return TwitterHelper.getHomeTimeLine(twitter);
     }
     
-    @RequestMapping(value = "/uploadTimeLine", method = RequestMethod.POST)
+    @RequestMapping(value = "/uploadtimeline", method = RequestMethod.POST ,
+            produces = MediaType.APPLICATION_JSON_UTF8_VALUE)
     @ResponseBody
     public void uploadTimeLine()
     {
         TwitterHelper.updateStatus(twitter, "Test");
     }
 
-    @RequestMapping(value="/twitter/timeline", method=RequestMethod.GET)
-    public String showTimeline(Model model) {
-        return showTimeline("Home", model);
+    @RequestMapping(value="/timeline", method=RequestMethod.GET, produces = MediaType.APPLICATION_JSON_UTF8_VALUE)
+    public List<Tweet> showTimeline() {
+        return showTimeline("Home");
     }
 
-    @RequestMapping(value="/twitter/timeline/{timelineType}", method=RequestMethod.GET)
-    public String showTimeline(@PathVariable("timelineType") String timelineType, Model model) {
+    @RequestMapping(value="/timeline/{timelineType}", method=RequestMethod.GET,
+            produces = MediaType.APPLICATION_JSON_UTF8_VALUE)
+    public List<Tweet> showTimeline(@PathVariable("timelineType") String timelineType) {
         if (timelineType.equals("Home")) {
-            model.addAttribute("timeline", twitter.timelineOperations().getHomeTimeline());
+            return twitter.timelineOperations().getHomeTimeline();
         } else if(timelineType.equals("User")) {
-            model.addAttribute("timeline", twitter.timelineOperations().getUserTimeline());
+            return twitter.timelineOperations().getUserTimeline();
         } else if(timelineType.equals("Mentions")) {
-            model.addAttribute("timeline", twitter.timelineOperations().getMentions());
+            return twitter.timelineOperations().getMentions();
         } else if(timelineType.equals("Favorites")) {
-            model.addAttribute("timeline", twitter.timelineOperations().getFavorites());
+            return twitter.timelineOperations().getFavorites();
         }
-        model.addAttribute("timelineName", timelineType);
-        return "twitter/timeline";
+        return null;
     }
 
 
-    @RequestMapping(value="/twitter/tweet", method=RequestMethod.POST)
-    public String postTweet(String message) {
-        twitter.timelineOperations().updateStatus(message);
-        return "redirect:/twitter";
+    @RequestMapping(value="/tweet", method=RequestMethod.POST, produces = MediaType.APPLICATION_JSON_UTF8_VALUE)
+    public Tweet postTweet(String message) {
+        return twitter.timelineOperations().updateStatus(message);
     }
 
-    @RequestMapping(value="/twitter/search", method=RequestMethod.GET)
-    public String showTrends(@RequestParam("query") String query, Model model) {
-        model.addAttribute("timeline", twitter.searchOperations().search(query).getTweets());
-        return "twitter/timeline";
+    @RequestMapping(value="/search", method=RequestMethod.GET, produces = MediaType.APPLICATION_JSON_UTF8_VALUE)
+    public List<Tweet> showTrends(@RequestParam("query") String query) {
+        return twitter.searchOperations().search(query).getTweets();
     }
 
-    @RequestMapping(value="/twitter/trends", method=RequestMethod.GET)
-    public String showTrends(Model model) {
-        model.addAttribute("trends", twitter.searchOperations().getLocalTrends(WORLDWIDE_WOE));
-        return "twitter/trends";
+    @RequestMapping(value="/trends", method=RequestMethod.GET, produces = MediaType.APPLICATION_JSON_UTF8_VALUE)
+    public Trends showTrends() {
+        return twitter.searchOperations().getLocalTrends(WORLDWIDE_WOE);
     }
 
-    @RequestMapping(value="/twitter/friends", method=RequestMethod.GET)
-    public String friends(Model model) {
-        model.addAttribute("profiles", twitter.friendOperations().getFriends());
-        return "twitter/friends";
+    @RequestMapping(value="/friends", method=RequestMethod.GET, produces = MediaType.APPLICATION_JSON_UTF8_VALUE)
+    public CursoredList<TwitterProfile> friends() {
+       return twitter.friendOperations().getFriends();
     }
 
-    @RequestMapping(value="/twitter/followers", method=RequestMethod.GET)
-    public String followers(Model model) {
-        model.addAttribute("profiles", twitter.friendOperations().getFollowers());
-        return "twitter/friends";
-    }
-
-    @RequestMapping(value="/twitter", method=RequestMethod.GET)
-    public String home(Principal currentUser, Model model) {
-        Connection<Twitter> connection = connectionRepository.findPrimaryConnection(Twitter.class);
-        if (connection == null) {
-            return "redirect:/connect/twitter";
-        }
-        model.addAttribute("profile", connection.getApi().userOperations().getUserProfile());
-        return "twitter/profile";
+    @RequestMapping(value="/followers", method=RequestMethod.GET, produces = MediaType.APPLICATION_JSON_UTF8_VALUE)
+    public CursoredList<TwitterProfile> followers(Model model) {
+        return twitter.friendOperations().getFollowers();
     }
 
     @RequestMapping("/twitter/revoked")
