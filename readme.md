@@ -1,6 +1,6 @@
 ##Regiter an application in twitter
 
-![Optional Text](../master/images/registertwitter.png
+Check the image in images folder on how to create an app in Twitter
 
 Go to https://apps.twitter.com/
 Click on Keys and Access Token
